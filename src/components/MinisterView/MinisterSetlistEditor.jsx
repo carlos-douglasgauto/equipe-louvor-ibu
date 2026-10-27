@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Music, 
   Youtube, 
@@ -15,10 +15,22 @@ import {
   CheckCircle2,
   Calendar,
   Sparkles,
-  Info
+  Info,
+  Wand2,
+  BookOpen,
+  Loader2,
+  Search,
+  ClipboardPaste
 } from 'lucide-react';
-import { extractYouTubeId, getYouTubeThumbnail } from '../../utils/youtube';
+import { 
+  extractYouTubeId, 
+  getYouTubeThumbnail, 
+  fetchYouTubeMetadata, 
+  buildBananaCifrasUrl, 
+  buildCifraClubUrl 
+} from '../../utils/youtube';
 import { getSemitonesBetween, transposeChordsText } from '../../utils/transposer';
+import { loadSongCatalog, saveSongToCatalog, findSongInCatalog } from '../../utils/storage';
 
 const MUSICAL_KEYS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'];
 
@@ -32,12 +44,19 @@ export default function MinisterSetlistEditor({
   const [selectedScheduleId, setSelectedScheduleId] = useState(schedules[0]?.id || '');
   const [isEditingSong, setIsEditingSong] = useState(false);
   const [currentSong, setCurrentSong] = useState(null);
+  const [catalog, setCatalog] = useState(() => loadSongCatalog());
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [isFetchingAuto, setIsFetchingAuto] = useState(false);
+  const [autoFillMessage, setAutoFillMessage] = useState(null);
   const formRef = useRef(null);
 
   const activeSchedule = schedules.find(s => s.id === selectedScheduleId) || schedules[0];
 
+  useEffect(() => {
+    setCatalog(loadSongCatalog());
+  }, [schedules]);
+
   const scrollToForm = () => {
-    // Immediate scroll to top plus smooth formRef alignment
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(() => {
       if (formRef.current) {
@@ -46,7 +65,7 @@ export default function MinisterSetlistEditor({
     }, 60);
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isEditingSong && formRef.current) {
       formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -66,27 +85,279 @@ export default function MinisterSetlistEditor({
       notes: '',
       chordsText: ''
     });
+    setAutoFillMessage(null);
+    setCatalogSearch('');
     setIsEditingSong(true);
     scrollToForm();
   };
 
   const handleEditSong = (song) => {
     setCurrentSong({ ...song });
+    setAutoFillMessage(null);
+    setCatalogSearch('');
     setIsEditingSong(true);
     scrollToForm();
+  };
+
+  /**
+   * Applies a song from the Smart Church Catalog into the current form
+   */
+  const handleSelectFromCatalog = (catSong) => {
+    if (!catSong) return;
+    setCurrentSong(prev => ({
+      ...prev,
+      title: catSong.title,
+      artist: catSong.artist || prev.artist,
+      version: catSong.version || prev.version,
+      originalKey: catSong.originalKey || catSong.key || 'G',
+      key: catSong.key || catSong.originalKey || 'G',
+      bpm: catSong.bpm || 70,
+      youtubeUrl: prev.youtubeUrl || catSong.youtubeUrl || '',
+      cifraUrl: catSong.cifraUrl || buildBananaCifrasUrl(catSong.artist, catSong.title),
+      notes: catSong.notes || prev.notes || '',
+      chordsText: catSong.chordsText || prev.chordsText || ''
+    }));
+    setCatalogSearch('');
+    setAutoFillMessage({
+      type: 'success',
+      text: `Música "${catSong.title}" carregada do Catálogo da Igreja com Tom (${catSong.originalKey || catSong.key}), ${catSong.bpm || 70} BPM e Cifra completa!`
+    });
+  };
+
+  /**
+   * Auto-extracts Title, Artist, Key, BPM and Chords from YouTube URL + Catalog + Serverless API
+   */
+  const handleAutoExtractFromYouTube = async (urlToProcess) => {
+    const targetUrl = (urlToProcess ?? currentSong?.youtubeUrl ?? '').trim();
+    const videoId = extractYouTubeId(targetUrl);
+    if (!videoId) {
+      setAutoFillMessage({
+        type: 'warning',
+        text: 'Cole um link válido do YouTube para extrair os dados automaticamente.'
+      });
+      return;
+    }
+
+    setIsFetchingAuto(true);
+    setAutoFillMessage({
+      type: 'info',
+      text: 'Extraindo nome da música, tom, BPM e buscando cifra...'
+    });
+
+    try {
+      // 1. Fetch YouTube oEmbed metadata (Title + Channel/Artist)
+      const ytMeta = await fetchYouTubeMetadata(targetUrl);
+      const extractedTitle = ytMeta?.title || currentSong?.title || '';
+      const extractedArtist = ytMeta?.artist || currentSong?.artist || '';
+      const extractedVersion = ytMeta?.version || currentSong?.version || '';
+
+      // 2. Check Smart Church Catalog (by YouTube ID or extracted Title)
+      const catalogMatch = findSongInCatalog({
+        youtubeUrl: targetUrl,
+        title: extractedTitle,
+        artist: extractedArtist
+      });
+
+      const autoBananaUrl = buildBananaCifrasUrl(
+        catalogMatch?.artist || extractedArtist,
+        catalogMatch?.title || extractedTitle
+      );
+
+      if (catalogMatch) {
+        const origKey = ytMeta?.detectedKey || catalogMatch.originalKey || catalogMatch.key || 'G';
+        const bpmVal = ytMeta?.detectedBpm || catalogMatch.bpm || 70;
+        setCurrentSong(prev => ({
+          ...prev,
+          youtubeUrl: targetUrl,
+          title: catalogMatch.title || extractedTitle || prev.title,
+          artist: catalogMatch.artist || extractedArtist || prev.artist,
+          version: extractedVersion || catalogMatch.version || prev.version,
+          originalKey: origKey,
+          key: origKey,
+          bpm: bpmVal,
+          cifraUrl: catalogMatch.cifraUrl || autoBananaUrl || prev.cifraUrl,
+          notes: prev.notes || catalogMatch.notes || '',
+          chordsText: catalogMatch.chordsText || prev.chordsText || ''
+        }));
+        setAutoFillMessage({
+          type: 'success',
+          text: `✨ Extraído do YouTube + Catálogo: "${catalogMatch.title}" (${catalogMatch.artist}) • Tom Original: ${origKey} • ${bpmVal} BPM • Cifra preenchida!`
+        });
+        setIsFetchingAuto(false);
+        return;
+      }
+
+      // 3. Not in local catalog yet -> Try Serverless API (/api/fetch-cifra) to scrape Banana Cifras / Cifra Club
+      let apiResult = null;
+      if (extractedTitle) {
+        try {
+          const params = new URLSearchParams({
+            title: extractedTitle,
+            artist: extractedArtist,
+            url: currentSong?.cifraUrl || ''
+          });
+          const res = await fetch(`/api/fetch-cifra?${params.toString()}`);
+          if (res.ok) {
+            apiResult = await res.json();
+          }
+        } catch (_) {
+          // Ignore network error and use extracted YouTube metadata
+        }
+      }
+
+      const finalKey = apiResult?.originalKey || ytMeta?.detectedKey || currentSong?.originalKey || 'G';
+      const finalBpm = ytMeta?.detectedBpm || currentSong?.bpm || 70;
+      const finalCifraUrl = apiResult?.bananaCifrasUrl || autoBananaUrl || currentSong?.cifraUrl || '';
+      const finalChords = apiResult?.chordsText || currentSong?.chordsText || '';
+
+      setCurrentSong(prev => ({
+        ...prev,
+        youtubeUrl: targetUrl,
+        title: extractedTitle || prev.title,
+        artist: extractedArtist || prev.artist,
+        version: extractedVersion || prev.version,
+        originalKey: finalKey,
+        key: finalKey,
+        bpm: finalBpm,
+        cifraUrl: finalCifraUrl,
+        chordsText: finalChords
+      }));
+
+      if (apiResult?.found && finalChords) {
+        setAutoFillMessage({
+          type: 'success',
+          text: `✨ Música "${extractedTitle}" identificada no YouTube e cifra importada automaticamente no Tom ${finalKey}!`
+        });
+      } else if (extractedTitle) {
+        setAutoFillMessage({
+          type: 'success',
+          text: `✨ Título "${extractedTitle}" e artista "${extractedArtist}" extraídos do YouTube! Link do Banana Cifras gerado automaticamente.`
+        });
+      } else {
+        setAutoFillMessage({
+          type: 'warning',
+          text: 'Vídeo vinculado! Preencha o título da música ou selecione no catálogo acima.'
+        });
+      }
+    } catch (err) {
+      setAutoFillMessage({
+        type: 'warning',
+        text: 'Não foi possível consultar os metadados agora. Você pode preencher manualmente ou usar o Catálogo.'
+      });
+    } finally {
+      setIsFetchingAuto(false);
+    }
+  };
+
+  /**
+   * Fetches cifra & key when user typed Title/Artist or Cifra URL and clicks "Buscar Cifra"
+   */
+  const handleFetchCifraByTitle = async () => {
+    if (!currentSong?.title?.trim() && !currentSong?.cifraUrl?.trim()) {
+      setAutoFillMessage({
+        type: 'warning',
+        text: 'Digite o Título da Música (ou cole o link do YouTube) antes de buscar a cifra.'
+      });
+      return;
+    }
+
+    setIsFetchingAuto(true);
+    try {
+      // 1. Check catalog first
+      const catalogMatch = findSongInCatalog({
+        youtubeUrl: currentSong.youtubeUrl,
+        title: currentSong.title,
+        artist: currentSong.artist
+      });
+
+      if (catalogMatch && catalogMatch.chordsText) {
+        handleSelectFromCatalog(catalogMatch);
+        setIsFetchingAuto(false);
+        return;
+      }
+
+      // 2. Call serverless API
+      const params = new URLSearchParams({
+        title: currentSong.title || '',
+        artist: currentSong.artist || '',
+        url: currentSong.cifraUrl || ''
+      });
+      const res = await fetch(`/api/fetch-cifra?${params.toString()}`);
+      const data = res.ok ? await res.json() : null;
+      const bananaUrl = data?.bananaCifrasUrl || buildBananaCifrasUrl(currentSong.artist, currentSong.title);
+
+      if (data?.found && data.chordsText) {
+        setCurrentSong(prev => ({
+          ...prev,
+          originalKey: data.originalKey || prev.originalKey,
+          key: data.originalKey || prev.key,
+          cifraUrl: bananaUrl || prev.cifraUrl,
+          chordsText: data.chordsText
+        }));
+        setAutoFillMessage({
+          type: 'success',
+          text: `✨ Cifra e Tom Original (${data.originalKey || currentSong.originalKey}) importados com sucesso!`
+        });
+      } else {
+        setCurrentSong(prev => ({
+          ...prev,
+          cifraUrl: bananaUrl || prev.cifraUrl
+        }));
+        setAutoFillMessage({
+          type: 'info',
+          text: 'Link direto do Banana Cifras preparado! Clique em "Abrir no Banana Cifras" abaixo para copiar a cifra, se desejar.'
+        });
+      }
+    } catch (_) {
+      // Fallback
+    } finally {
+      setIsFetchingAuto(false);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        // Detect if pasted text starts with "Tom: X"
+        const tomMatch = text.match(/Tom:\s*([A-G][#b]?m?)\b/i);
+        const detectedKey = tomMatch ? tomMatch[1].replace(/m$/i, '') : null;
+        setCurrentSong(prev => ({
+          ...prev,
+          originalKey: detectedKey || prev.originalKey,
+          key: detectedKey || prev.key,
+          chordsText: text
+        }));
+        setAutoFillMessage({
+          type: 'success',
+          text: `📋 Cifra colada da área de transferência${detectedKey ? ` (Tom detectado: ${detectedKey})` : ''}! Ao salvar, ela ficará memorizada no Catálogo da Igreja.`
+        });
+      }
+    } catch (_) {
+      alert('Para colar, mantenha pressionado dentro do campo de Cifra e toque em "Colar".');
+    }
   };
 
   const handleSaveSong = (e) => {
     e.preventDefault();
     if (!currentSong.title.trim()) return;
 
+    const songToSave = {
+      ...currentSong,
+      cifraUrl: currentSong.cifraUrl || buildBananaCifrasUrl(currentSong.artist, currentSong.title)
+    };
+
+    // Save to persistent Church Catalog automatically!
+    saveSongToCatalog(songToSave);
+    setCatalog(loadSongCatalog());
+
     let updatedSongs = [...(activeSchedule.songs || [])];
-    const index = updatedSongs.findIndex(s => s.id === currentSong.id);
+    const index = updatedSongs.findIndex(s => s.id === songToSave.id);
 
     if (index !== -1) {
-      updatedSongs[index] = currentSong;
+      updatedSongs[index] = songToSave;
     } else {
-      updatedSongs.push(currentSong);
+      updatedSongs.push(songToSave);
     }
 
     onUpdateSchedule({
@@ -96,6 +367,7 @@ export default function MinisterSetlistEditor({
 
     setIsEditingSong(false);
     setCurrentSong(null);
+    setAutoFillMessage(null);
   };
 
   const handleDeleteSong = (id) => {
@@ -123,6 +395,16 @@ export default function MinisterSetlistEditor({
     });
   };
 
+  // Filtered catalog suggestions for search or title autocomplete
+  const filteredCatalog = catalog.filter(item => {
+    const q = (catalogSearch || currentSong?.title || '').toLowerCase().trim();
+    if (!q) return true;
+    return (
+      item.title.toLowerCase().includes(q) ||
+      (item.artist && item.artist.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <div className="space-y-6">
       
@@ -141,7 +423,7 @@ export default function MinisterSetlistEditor({
               Repertório do Louvor & Vídeos de Referência
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-2xl">
-              Escolha as músicas do seu culto, defina o tom, adicione o link do vídeo do YouTube da versão exata que você deseja e compartilhe as cifras com a equipe para ensaiarem.
+              Cole o link do YouTube ou escolha do Catálogo Inteligente da Igreja para preencher Nome, Artista, Tom Original, BPM e Cifra automaticamente.
             </p>
           </div>
 
@@ -231,12 +513,12 @@ export default function MinisterSetlistEditor({
             <form 
               ref={formRef} 
               onSubmit={handleSaveSong} 
-              className="glass-card p-5 sm:p-6 rounded-2xl border-red-500/50 ring-2 ring-red-400/30 scroll-mt-24 animate-fade-in space-y-4"
+              className="glass-card p-5 sm:p-6 rounded-2xl border-red-500/50 ring-2 ring-red-400/30 scroll-mt-24 animate-fade-in space-y-5"
             >
               <div className="flex items-center justify-between border-b dark:border-slate-800 border-slate-200 pb-3">
                 <h4 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-red-500" />
-                  <span>{currentSong.title ? `Editar: ${currentSong.title}` : 'Nova Música do Culto'}</span>
+                  <span>{currentSong.title ? `Editar: ${currentSong.title}` : 'Nova Música do Culto (Preenchimento Inteligente)'}</span>
                 </h4>
                 <button
                   type="button"
@@ -247,17 +529,130 @@ export default function MinisterSetlistEditor({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* STEP 1: Fast Fill via YouTube Link OR Smart Church Catalog */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 rounded-xl bg-red-50/60 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50">
+                
+                {/* Option A: Paste YouTube Link to Auto-Extract */}
                 <div>
+                  <label className="block text-xs font-bold text-red-700 dark:text-red-400 mb-1 flex items-center gap-1.5">
+                    <Youtube className="w-4 h-4" />
+                    <span>1. Cole o Link do YouTube (Extrai Nome, Tom, BPM e Cifra)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={currentSong.youtubeUrl}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setCurrentSong(prev => ({ ...prev, youtubeUrl: val }));
+                        if (extractYouTubeId(val)) {
+                          handleAutoExtractFromYouTube(val);
+                        }
+                      }}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      className="flex-1 bg-white dark:bg-slate-900 border border-red-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={isFetchingAuto}
+                      onClick={() => handleAutoExtractFromYouTube(currentSong.youtubeUrl)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold transition shrink-0 shadow-xs"
+                      title="Extrair informações do vídeo do YouTube"
+                    >
+                      {isFetchingAuto ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Wand2 className="w-3.5 h-3.5" />
+                      )}
+                      <span>Puxar Dados</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
+                    Ao colar o link, o app identifica o título/cantor no YouTube e já busca a cifra e o tom automaticamente.
+                  </p>
+                </div>
+
+                {/* Option B: Smart Church Catalog Picker */}
+                <div>
+                  <label className="block text-xs font-bold text-sky-700 dark:text-sky-400 mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <BookOpen className="w-4 h-4" />
+                      <span>Ou Escolha do Catálogo Inteligente da Igreja ({catalog.length} músicas)</span>
+                    </span>
+                    <span className="text-[10px] font-normal text-slate-500">1 clique preenche tudo</span>
+                  </label>
+                  <select
+                    value=""
+                    onChange={e => {
+                      const found = catalog.find(c => c.id === e.target.value || c.title === e.target.value);
+                      if (found) handleSelectFromCatalog(found);
+                    }}
+                    className="w-full bg-white dark:bg-slate-900 border border-sky-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-xs font-semibold focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="">📚 Selecionar música do repertório da igreja...</option>
+                    {catalog.map((cat) => (
+                      <option key={cat.id || cat.title} value={cat.title}>
+                        {cat.title} — {cat.artist} (Tom: {cat.originalKey || cat.key} • {cat.bpm || 70} BPM)
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
+                    Toda música salva por um ministro fica memorizada aqui para ninguém precisar recadastrar do zero.
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Banner when Auto-Fill runs */}
+              {autoFillMessage && (
+                <div className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                  autoFillMessage.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                    : autoFillMessage.type === 'warning'
+                    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+                    : 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-800 dark:text-sky-300'
+                }`}>
+                  <div className="flex items-center gap-2 font-medium">
+                    <Sparkles className="w-4 h-4 shrink-0" />
+                    <span>{autoFillMessage.text}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAutoFillMessage(null)}
+                    className="text-[10px] underline opacity-75 hover:opacity-100 shrink-0"
+                  >
+                     dispensar
+                  </button>
+                </div>
+              )}
+
+              {/* STEP 2: Song Details (Title, Artist, Original Key, Minister Key) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="relative">
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Título da Música *</label>
                   <input
                     type="text"
                     required
                     value={currentSong.title}
                     onChange={e => setCurrentSong({ ...currentSong, title: e.target.value })}
-                    placeholder="Ex: Bondade de Deus"
+                    placeholder="Ex: Emaús / Bondade de Deus"
                     className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
                   />
+                  {/* Quick inline catalog match suggestion while typing title */}
+                  {currentSong.title && currentSong.title.length >= 2 && !currentSong.chordsText && filteredCatalog.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                      <span className="text-[10px] text-slate-500">Sugestão:</span>
+                      {filteredCatalog.slice(0, 2).map(sug => (
+                        <button
+                          key={sug.id || sug.title}
+                          type="button"
+                          onClick={() => handleSelectFromCatalog(sug)}
+                          className="text-[10px] px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800 hover:bg-sky-200 transition font-semibold"
+                        >
+                          ⚡ {sug.title} ({sug.originalKey || sug.key})
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -266,7 +661,7 @@ export default function MinisterSetlistEditor({
                     type="text"
                     value={currentSong.artist}
                     onChange={e => setCurrentSong({ ...currentSong, artist: e.target.value })}
-                    placeholder="Ex: Isaías Saad / Bethel"
+                    placeholder="Ex: Morada / Isaías Saad"
                     className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
                   />
                 </div>
@@ -334,89 +729,120 @@ export default function MinisterSetlistEditor({
                 </div>
               )}
 
-              {/* YouTube Reference & Version */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
-                <div>
-                  <label className="block text-xs font-semibold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1.5">
-                    <Youtube className="w-4 h-4" />
-                    <span>Link do YouTube (Vídeo de Referência)</span>
-                  </label>
-                  <input
-                    type="url"
-                    value={currentSong.youtubeUrl}
-                    onChange={e => setCurrentSong({ ...currentSong, youtubeUrl: e.target.value })}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Cole o link da versão exata que você quer que a banda estude.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Descrição da Versão / Cantor Específico
-                  </label>
-                  <input
-                    type="text"
-                    value={currentSong.version}
-                    onChange={e => setCurrentSong({ ...currentSong, version: e.target.value })}
-                    placeholder="Ex: Versão Ao Vivo Gabriela Rocha (Acústico)"
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Ajuda os músicos a saberem se é versão rápida, acústica ou ao vivo.
-                  </p>
-                </div>
-              </div>
-
-              {/* Arrangements and Chords */}
+              {/* Version, BPM, Cifra Link & Notes */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Orientações e Dinâmica de Arranjo
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={currentSong.notes}
-                    onChange={e => setCurrentSong({ ...currentSong, notes: e.target.value })}
-                    placeholder="Ex: Começa suave só teclado e voz. Na ponte sobe a dinâmica com a bateria cheia. No final faz refrão a capella."
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg p-2.5 text-xs focus:border-red-500 focus:outline-none"
-                  />
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Descrição da Versão / Cantor Específico
+                    </label>
+                    <input
+                      type="text"
+                      value={currentSong.version}
+                      onChange={e => setCurrentSong({ ...currentSong, version: e.target.value })}
+                      placeholder="Ex: Versão Ao Vivo Gabriela Rocha (Acústico)"
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Orientações e Dinâmica de Arranjo
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={currentSong.notes}
+                      onChange={e => setCurrentSong({ ...currentSong, notes: e.target.value })}
+                      placeholder="Ex: Começa suave só teclado e voz. Na ponte sobe a dinâmica com a bateria cheia."
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg p-2.5 text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                    <span>Link da Cifra (Cifra Club ou Banana Cifras)</span>
-                    <span className="text-[10px] text-slate-500 font-normal">Opcional</span>
-                  </label>
-                  <input
-                    type="url"
-                    value={currentSong.cifraUrl}
-                    onChange={e => setCurrentSong({ ...currentSong, cifraUrl: e.target.value })}
-                    placeholder="https://www.bananacifras.com/..."
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none mb-2"
-                  />
-                  <div className="flex items-center gap-2">
-                    <label className="text-[11px] text-slate-600 dark:text-slate-400">BPM:</label>
-                    <input
-                      type="number"
-                      value={currentSong.bpm || 70}
-                      onChange={e => setCurrentSong({ ...currentSong, bpm: Number(e.target.value) })}
-                      className="w-20 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1 text-xs font-mono"
-                    />
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                      <span>Link da Cifra (Banana Cifras / Cifra Club)</span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Gerado automaticamente</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={currentSong.cifraUrl || buildBananaCifrasUrl(currentSong.artist, currentSong.title)}
+                        onChange={e => setCurrentSong({ ...currentSong, cifraUrl: e.target.value })}
+                        placeholder="https://www.bananacifras.com/cifra/..."
+                        className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleFetchCifraByTitle}
+                        disabled={isFetchingAuto}
+                        className="px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition shrink-0 flex items-center gap-1"
+                        title="Buscar cifra e tom automaticamente"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                        <span>Buscar Cifra</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">BPM (Andamento):</label>
+                      <input
+                        type="number"
+                        value={currentSong.bpm || 70}
+                        onChange={e => setCurrentSong({ ...currentSong, bpm: Number(e.target.value) })}
+                        className="w-20 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold"
+                      />
+                    </div>
+
+                    {/* Direct Shortcuts to Banana Cifras & Cifra Club */}
+                    {(currentSong.title || currentSong.cifraUrl) && (
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={currentSong.cifraUrl || buildBananaCifrasUrl(currentSong.artist, currentSong.title) || 'https://www.bananacifras.com'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 hover:bg-amber-200 transition"
+                        >
+                          <span>🍌 Banana Cifras</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                        <a
+                          href={buildCifraClubUrl(currentSong.artist, currentSong.title) || 'https://www.cifraclub.com.br'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 transition"
+                        >
+                          <span>🎸 Cifra Club</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Chords / Letra Textarea */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span>Letra com Cifras (para visualização no app)</span>
-                  <span className="text-[10px] text-sky-600 dark:text-sky-400">Suporta transposição automática no app!</span>
-                </label>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Letra com Cifras (para visualização e transposição em 1 ou 2 colunas no app)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePasteFromClipboard}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-sky-100 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800 hover:bg-sky-200 transition"
+                    >
+                      <ClipboardPaste className="w-3.5 h-3.5" />
+                      <span>Colar Cifra Copiada</span>
+                    </button>
+                  </div>
+                </div>
                 <textarea
-                  rows={6}
+                  rows={7}
                   value={currentSong.chordsText}
                   onChange={e => setCurrentSong({ ...currentSong, chordsText: e.target.value })}
                   placeholder={`Tom: ${currentSong.key || 'G'}\n[Intro] G  C9  G  C9\n\nG\nTe amo, Deus\n      C9          G\nTua graça nunca falha...`}
@@ -463,7 +889,7 @@ export default function MinisterSetlistEditor({
                 </p>
                 <button
                   onClick={handleOpenNewSong}
-                  className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-amber-500 text-slate-950 hover:bg-amber-400 transition"
+                  className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-500 transition"
                 >
                   + Adicionar Primeira Música
                 </button>
@@ -491,7 +917,7 @@ export default function MinisterSetlistEditor({
                           >
                             <MoveUp className="w-3.5 h-3.5" />
                           </button>
-                          <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 text-amber-700 dark:text-amber-300 font-mono font-bold text-xs flex items-center justify-center">
+                          <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 text-red-700 dark:text-red-300 font-mono font-bold text-xs flex items-center justify-center">
                             {idx + 1}
                           </span>
                           <button
@@ -525,7 +951,7 @@ export default function MinisterSetlistEditor({
                           </div>
                         )}
 
-                        {/* Title, Artist, Version & Notes with crisp contrast for both light & dark mode */}
+                        {/* Title, Artist, Version & Notes */}
                         <div className="min-w-0 flex-1">
                           <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-base line-clamp-1" title={song.title}>
                             {song.title}
@@ -564,7 +990,7 @@ export default function MinisterSetlistEditor({
                         </div>
                       </div>
 
-                      {/* Right: Actions with high contrast */}
+                      {/* Right: Actions */}
                       <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
                         {/* Play Reference Video */}
                         <button

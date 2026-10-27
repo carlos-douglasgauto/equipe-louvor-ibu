@@ -14,6 +14,7 @@ import {
   saveSchedules, 
   loadMembers, 
   saveMembers, 
+  saveSongToCatalog,
   exportAllData, 
   resetAllData 
 } from './utils/storage';
@@ -91,12 +92,14 @@ export default function App() {
     setSchedules(prev => prev.map(sched => {
       const updatedSongs = (sched.songs || []).map(song => {
         if (song.id === songId) {
-          return {
+          const updatedSong = {
             ...song,
             chordsText: newChordsText,
             notes: newNotes !== undefined ? newNotes : song.notes,
             key: newKey || song.key
           };
+          saveSongToCatalog(updatedSong);
+          return updatedSong;
         }
         return song;
       });
