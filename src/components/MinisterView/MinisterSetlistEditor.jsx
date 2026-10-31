@@ -12,14 +12,10 @@ import {
   MoveDown, 
   ExternalLink,
   Mic2,
-  CheckCircle2,
-  Calendar,
   Sparkles,
-  Info,
   Wand2,
   BookOpen,
   Loader2,
-  Search,
   ClipboardPaste
 } from 'lucide-react';
 import { 
@@ -39,7 +35,8 @@ export default function MinisterSetlistEditor({
   onUpdateSchedule,
   onOpenYouTubePlayer,
   onOpenChordViewer,
-  onOpenWhatsApp
+  onOpenWhatsApp,
+  onOpenGoogleDocsModal
 }) {
   const [selectedScheduleId, setSelectedScheduleId] = useState(schedules[0]?.id || '');
   const [isEditingSong, setIsEditingSong] = useState(false);
@@ -120,12 +117,12 @@ export default function MinisterSetlistEditor({
     setCatalogSearch('');
     setAutoFillMessage({
       type: 'success',
-      text: `Música "${catSong.title}" carregada do Catálogo da Igreja com Tom (${catSong.originalKey || catSong.key}), ${catSong.bpm || 70} BPM e Cifra completa!`
+      text: `Música "${catSong.title}" carregada com Tom (${catSong.originalKey || catSong.key}), ${catSong.bpm || 70} BPM e Cifra completa!`
     });
   };
 
   /**
-   * Auto-extracts Title, Artist, Key, BPM and Chords from YouTube URL + Catalog + Serverless API
+   * Extracts Title & Artist from YouTube oEmbed and checks Church Catalog / Google Docs songs
    */
   const handleAutoExtractFromYouTube = async (urlToProcess) => {
     const targetUrl = (urlToProcess ?? currentSong?.youtubeUrl ?? '').trim();
@@ -133,7 +130,7 @@ export default function MinisterSetlistEditor({
     if (!videoId) {
       setAutoFillMessage({
         type: 'warning',
-        text: 'Cole um link válido do YouTube para extrair os dados automaticamente.'
+        text: 'Cole um link válido do YouTube para identificar o nome da música e artista.'
       });
       return;
     }
@@ -141,17 +138,15 @@ export default function MinisterSetlistEditor({
     setIsFetchingAuto(true);
     setAutoFillMessage({
       type: 'info',
-      text: 'Extraindo nome da música, tom, BPM e buscando cifra...'
+      text: 'Identificando título e artista pelo link do YouTube...'
     });
 
     try {
-      // 1. Fetch YouTube oEmbed metadata (Title + Channel/Artist)
       const ytMeta = await fetchYouTubeMetadata(targetUrl);
       const extractedTitle = ytMeta?.title || currentSong?.title || '';
       const extractedArtist = ytMeta?.artist || currentSong?.artist || '';
       const extractedVersion = ytMeta?.version || currentSong?.version || '';
 
-      // 2. Check Smart Church Catalog (by YouTube ID or extracted Title)
       const catalogMatch = findSongInCatalog({
         youtubeUrl: targetUrl,
         title: extractedTitle,
@@ -181,135 +176,32 @@ export default function MinisterSetlistEditor({
         }));
         setAutoFillMessage({
           type: 'success',
-          text: `✨ Extraído do YouTube + Catálogo: "${catalogMatch.title}" (${catalogMatch.artist}) • Tom Original: ${origKey} • ${bpmVal} BPM • Cifra preenchida!`
-        });
-        setIsFetchingAuto(false);
-        return;
-      }
-
-      // 3. Not in local catalog yet -> Try Serverless API (/api/fetch-cifra) to scrape Banana Cifras / Cifra Club
-      let apiResult = null;
-      if (extractedTitle) {
-        try {
-          const params = new URLSearchParams({
-            title: extractedTitle,
-            artist: extractedArtist,
-            url: currentSong?.cifraUrl || ''
-          });
-          const res = await fetch(`/api/fetch-cifra?${params.toString()}`);
-          if (res.ok) {
-            apiResult = await res.json();
-          }
-        } catch (_) {
-          // Ignore network error and use extracted YouTube metadata
-        }
-      }
-
-      const finalKey = apiResult?.originalKey || ytMeta?.detectedKey || currentSong?.originalKey || 'G';
-      const finalBpm = ytMeta?.detectedBpm || currentSong?.bpm || 70;
-      const finalCifraUrl = apiResult?.bananaCifrasUrl || autoBananaUrl || currentSong?.cifraUrl || '';
-      const finalChords = apiResult?.chordsText || currentSong?.chordsText || '';
-
-      setCurrentSong(prev => ({
-        ...prev,
-        youtubeUrl: targetUrl,
-        title: extractedTitle || prev.title,
-        artist: extractedArtist || prev.artist,
-        version: extractedVersion || prev.version,
-        originalKey: finalKey,
-        key: finalKey,
-        bpm: finalBpm,
-        cifraUrl: finalCifraUrl,
-        chordsText: finalChords
-      }));
-
-      if (apiResult?.found && finalChords) {
-        setAutoFillMessage({
-          type: 'success',
-          text: `✨ Música "${extractedTitle}" identificada no YouTube e cifra importada automaticamente no Tom ${finalKey}!`
-        });
-      } else if (extractedTitle) {
-        setAutoFillMessage({
-          type: 'success',
-          text: `✨ Título "${extractedTitle}" e artista "${extractedArtist}" extraídos do YouTube! Link do Banana Cifras gerado automaticamente.`
+          text: `✨ Extraído do YouTube + Catálogo/Docs: "${catalogMatch.title}" (${catalogMatch.artist}) • Tom: ${origKey} • Cifra preenchida!`
         });
       } else {
-        setAutoFillMessage({
-          type: 'warning',
-          text: 'Vídeo vinculado! Preencha o título da música ou selecione no catálogo acima.'
-        });
-      }
-    } catch (err) {
-      setAutoFillMessage({
-        type: 'warning',
-        text: 'Não foi possível consultar os metadados agora. Você pode preencher manualmente ou usar o Catálogo.'
-      });
-    } finally {
-      setIsFetchingAuto(false);
-    }
-  };
-
-  /**
-   * Fetches cifra & key when user typed Title/Artist or Cifra URL and clicks "Buscar Cifra"
-   */
-  const handleFetchCifraByTitle = async () => {
-    if (!currentSong?.title?.trim() && !currentSong?.cifraUrl?.trim()) {
-      setAutoFillMessage({
-        type: 'warning',
-        text: 'Digite o Título da Música (ou cole o link do YouTube) antes de buscar a cifra.'
-      });
-      return;
-    }
-
-    setIsFetchingAuto(true);
-    try {
-      // 1. Check catalog first
-      const catalogMatch = findSongInCatalog({
-        youtubeUrl: currentSong.youtubeUrl,
-        title: currentSong.title,
-        artist: currentSong.artist
-      });
-
-      if (catalogMatch && catalogMatch.chordsText) {
-        handleSelectFromCatalog(catalogMatch);
-        setIsFetchingAuto(false);
-        return;
-      }
-
-      // 2. Call serverless API
-      const params = new URLSearchParams({
-        title: currentSong.title || '',
-        artist: currentSong.artist || '',
-        url: currentSong.cifraUrl || ''
-      });
-      const res = await fetch(`/api/fetch-cifra?${params.toString()}`);
-      const data = res.ok ? await res.json() : null;
-      const bananaUrl = data?.bananaCifrasUrl || buildBananaCifrasUrl(currentSong.artist, currentSong.title);
-
-      if (data?.found && data.chordsText) {
+        const finalKey = ytMeta?.detectedKey || currentSong?.originalKey || 'G';
+        const finalBpm = ytMeta?.detectedBpm || currentSong?.bpm || 70;
         setCurrentSong(prev => ({
           ...prev,
-          originalKey: data.originalKey || prev.originalKey,
-          key: data.originalKey || prev.key,
-          cifraUrl: bananaUrl || prev.cifraUrl,
-          chordsText: data.chordsText
+          youtubeUrl: targetUrl,
+          title: extractedTitle || prev.title,
+          artist: extractedArtist || prev.artist,
+          version: extractedVersion || prev.version,
+          originalKey: finalKey,
+          key: finalKey,
+          bpm: finalBpm,
+          cifraUrl: autoBananaUrl || prev.cifraUrl
         }));
         setAutoFillMessage({
           type: 'success',
-          text: `✨ Cifra e Tom Original (${data.originalKey || currentSong.originalKey}) importados com sucesso!`
-        });
-      } else {
-        setCurrentSong(prev => ({
-          ...prev,
-          cifraUrl: bananaUrl || prev.cifraUrl
-        }));
-        setAutoFillMessage({
-          type: 'info',
-          text: 'Link direto do Banana Cifras preparado! Clique em "Abrir no Banana Cifras" abaixo para copiar a cifra, se desejar.'
+          text: `✨ Título "${extractedTitle}" e cantor "${extractedArtist}" extraídos do YouTube!`
         });
       }
     } catch (_) {
-      // Fallback
+      setAutoFillMessage({
+        type: 'warning',
+        text: 'Link do YouTube vinculado! Confira os campos de título e tom abaixo.'
+      });
     } finally {
       setIsFetchingAuto(false);
     }
@@ -319,7 +211,6 @@ export default function MinisterSetlistEditor({
     try {
       const text = await navigator.clipboard.readText();
       if (text && text.trim()) {
-        // Detect if pasted text starts with "Tom: X"
         const tomMatch = text.match(/Tom:\s*([A-G][#b]?m?)\b/i);
         const detectedKey = tomMatch ? tomMatch[1].replace(/m$/i, '') : null;
         setCurrentSong(prev => ({
@@ -330,11 +221,11 @@ export default function MinisterSetlistEditor({
         }));
         setAutoFillMessage({
           type: 'success',
-          text: `📋 Cifra colada da área de transferência${detectedKey ? ` (Tom detectado: ${detectedKey})` : ''}! Ao salvar, ela ficará memorizada no Catálogo da Igreja.`
+          text: `📋 Cifra colada com sucesso${detectedKey ? ` (Tom detectado: ${detectedKey})` : ''}!`
         });
       }
     } catch (_) {
-      alert('Para colar, mantenha pressionado dentro do campo de Cifra e toque em "Colar".');
+      alert('Para colar no celular, toque e segure dentro da caixa de Cifra e escolha "Colar".');
     }
   };
 
@@ -347,7 +238,6 @@ export default function MinisterSetlistEditor({
       cifraUrl: currentSong.cifraUrl || buildBananaCifrasUrl(currentSong.artist, currentSong.title)
     };
 
-    // Save to persistent Church Catalog automatically!
     saveSongToCatalog(songToSave);
     setCatalog(loadSongCatalog());
 
@@ -395,7 +285,6 @@ export default function MinisterSetlistEditor({
     });
   };
 
-  // Filtered catalog suggestions for search or title autocomplete
   const filteredCatalog = catalog.filter(item => {
     const q = (catalogSearch || currentSong?.title || '').toLowerCase().trim();
     if (!q) return true;
@@ -423,17 +312,27 @@ export default function MinisterSetlistEditor({
               Repertório do Louvor & Vídeos de Referência
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-2xl">
-              Cole o link do YouTube ou escolha do Catálogo Inteligente da Igreja para preencher Nome, Artista, Tom Original, BPM e Cifra automaticamente.
+              Importe a lista de músicas e cifras diretamente do Google Docs da semana ou adicione pelos links do YouTube. Todas as alterações sincronizam na nuvem para toda a equipe.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenGoogleDocsModal && (
+              <button
+                type="button"
+                onClick={() => onOpenGoogleDocsModal(activeSchedule?.id)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-sky-600 hover:bg-sky-500 text-white transition shadow-lg shadow-sky-600/20"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Importar do Google Docs</span>
+              </button>
+            )}
             <button
               onClick={() => onOpenWhatsApp(activeSchedule)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-lg shadow-emerald-600/20"
             >
               <Share2 className="w-4 h-4" />
-              <span>Enviar Repertório no WhatsApp</span>
+              <span>Enviar no WhatsApp</span>
             </button>
           </div>
         </div>
@@ -499,13 +398,25 @@ export default function MinisterSetlistEditor({
               </p>
             </div>
 
-            <button
-              onClick={handleOpenNewSong}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-red-600 hover:bg-red-500 text-white transition shadow-lg shadow-red-600/25 shrink-0 self-start md:self-center"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>Adicionar Música ao Repertório</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 shrink-0 self-start md:self-center">
+              {onOpenGoogleDocsModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenGoogleDocsModal(activeSchedule.id)}
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-800 hover:bg-sky-100 transition"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Mapear Google Docs</span>
+                </button>
+              )}
+              <button
+                onClick={handleOpenNewSong}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-red-600 hover:bg-red-500 text-white transition shadow-lg shadow-red-600/25"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>Adicionar Música ao Repertório</span>
+              </button>
+            </div>
           </div>
 
           {/* Add / Edit Song Form */}
@@ -518,7 +429,7 @@ export default function MinisterSetlistEditor({
               <div className="flex items-center justify-between border-b dark:border-slate-800 border-slate-200 pb-3">
                 <h4 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-red-500" />
-                  <span>{currentSong.title ? `Editar: ${currentSong.title}` : 'Nova Música do Culto (Preenchimento Inteligente)'}</span>
+                  <span>{currentSong.title ? `Editar: ${currentSong.title}` : 'Nova Música do Culto'}</span>
                 </h4>
                 <button
                   type="button"
@@ -536,7 +447,7 @@ export default function MinisterSetlistEditor({
                 <div>
                   <label className="block text-xs font-bold text-red-700 dark:text-red-400 mb-1 flex items-center gap-1.5">
                     <Youtube className="w-4 h-4" />
-                    <span>1. Cole o Link do YouTube (Extrai Nome, Tom, BPM e Cifra)</span>
+                    <span>1. Link do YouTube (Preenche Nome e Cantor Automaticamente)</span>
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -557,18 +468,18 @@ export default function MinisterSetlistEditor({
                       disabled={isFetchingAuto}
                       onClick={() => handleAutoExtractFromYouTube(currentSong.youtubeUrl)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold transition shrink-0 shadow-xs"
-                      title="Extrair informações do vídeo do YouTube"
+                      title="Extrair título e artista do vídeo do YouTube"
                     >
                       {isFetchingAuto ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <Wand2 className="w-3.5 h-3.5" />
                       )}
-                      <span>Puxar Dados</span>
+                      <span>Extrair Nome</span>
                     </button>
                   </div>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
-                    Ao colar o link, o app identifica o título/cantor no YouTube e já busca a cifra e o tom automaticamente.
+                    Se a música já estiver no Google Docs ou Catálogo da Igreja, o Tom e a Cifra também são preenchidos na hora.
                   </p>
                 </div>
 
@@ -577,7 +488,7 @@ export default function MinisterSetlistEditor({
                   <label className="block text-xs font-bold text-sky-700 dark:text-sky-400 mb-1 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <BookOpen className="w-4 h-4" />
-                      <span>Ou Escolha do Catálogo Inteligente da Igreja ({catalog.length} músicas)</span>
+                      <span>Ou Escolha do Catálogo / Google Docs ({catalog.length} músicas)</span>
                     </span>
                     <span className="text-[10px] font-normal text-slate-500">1 clique preenche tudo</span>
                   </label>
@@ -589,15 +500,15 @@ export default function MinisterSetlistEditor({
                     }}
                     className="w-full bg-white dark:bg-slate-900 border border-sky-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-2 text-xs font-semibold focus:border-sky-500 focus:outline-none"
                   >
-                    <option value="">📚 Selecionar música do repertório da igreja...</option>
+                    <option value="">📚 Selecionar música já mapeada na igreja...</option>
                     {catalog.map((cat) => (
                       <option key={cat.id || cat.title} value={cat.title}>
-                        {cat.title} — {cat.artist} (Tom: {cat.originalKey || cat.key} • {cat.bpm || 70} BPM)
+                        {cat.title} — {cat.artist} (Tom: {cat.originalKey || cat.key})
                       </option>
                     ))}
                   </select>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
-                    Toda música salva por um ministro fica memorizada aqui para ninguém precisar recadastrar do zero.
+                    Inclui as músicas importadas do Google Docs e o repertório salvo da igreja.
                   </p>
                 </div>
               </div>
@@ -620,7 +531,7 @@ export default function MinisterSetlistEditor({
                     onClick={() => setAutoFillMessage(null)}
                     className="text-[10px] underline opacity-75 hover:opacity-100 shrink-0"
                   >
-                     dispensar
+                    dispensar
                   </button>
                 </div>
               )}
@@ -634,13 +545,12 @@ export default function MinisterSetlistEditor({
                     required
                     value={currentSong.title}
                     onChange={e => setCurrentSong({ ...currentSong, title: e.target.value })}
-                    placeholder="Ex: Emaús / Bondade de Deus"
+                    placeholder="Ex: Espírito Enche a Minha Vida"
                     className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
                   />
-                  {/* Quick inline catalog match suggestion while typing title */}
                   {currentSong.title && currentSong.title.length >= 2 && !currentSong.chordsText && filteredCatalog.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                      <span className="text-[10px] text-slate-500">Sugestão:</span>
+                      <span className="text-[10px] text-slate-500">Auto-preencher:</span>
                       {filteredCatalog.slice(0, 2).map(sug => (
                         <button
                           key={sug.id || sug.title}
@@ -661,7 +571,7 @@ export default function MinisterSetlistEditor({
                     type="text"
                     value={currentSong.artist}
                     onChange={e => setCurrentSong({ ...currentSong, artist: e.target.value })}
-                    placeholder="Ex: Morada / Isaías Saad"
+                    placeholder="Ex: Morada / Quatro por Um"
                     className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
                   />
                 </div>
@@ -669,7 +579,7 @@ export default function MinisterSetlistEditor({
                 {/* Tom Original (YouTube) */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Tom Original (YouTube / Gravação)
+                    Tom Original (YouTube / Docs)
                   </label>
                   <select
                     value={currentSong.originalKey || currentSong.key || 'G'}
@@ -723,13 +633,13 @@ export default function MinisterSetlistEditor({
                       }}
                       className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition shadow-xs text-xs shrink-0 self-start sm:self-center"
                     >
-                      Transpor Cifra Automática de {currentSong.originalKey} para {currentSong.key}
+                      Transpor Cifra de {currentSong.originalKey} para {currentSong.key}
                     </button>
                   )}
                 </div>
               )}
 
-              {/* Version, BPM, Cifra Link & Notes */}
+              {/* Version, BPM, Reference Links & Notes */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-3">
                   <div>
@@ -740,7 +650,7 @@ export default function MinisterSetlistEditor({
                       type="text"
                       value={currentSong.version}
                       onChange={e => setCurrentSong({ ...currentSong, version: e.target.value })}
-                      placeholder="Ex: Versão Ao Vivo Gabriela Rocha (Acústico)"
+                      placeholder="Ex: Versão Ao Vivo Gabriela Rocha"
                       className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
                     />
                   </div>
@@ -761,34 +671,21 @@ export default function MinisterSetlistEditor({
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                      <span>Link da Cifra (Banana Cifras / Cifra Club)</span>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Gerado automaticamente</span>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Link de Referência da Cifra (Opcional)
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={currentSong.cifraUrl || buildBananaCifrasUrl(currentSong.artist, currentSong.title)}
-                        onChange={e => setCurrentSong({ ...currentSong, cifraUrl: e.target.value })}
-                        placeholder="https://www.bananacifras.com/cifra/..."
-                        className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleFetchCifraByTitle}
-                        disabled={isFetchingAuto}
-                        className="px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition shrink-0 flex items-center gap-1"
-                        title="Buscar cifra e tom automaticamente"
-                      >
-                        <Search className="w-3.5 h-3.5" />
-                        <span>Buscar Cifra</span>
-                      </button>
-                    </div>
+                    <input
+                      type="url"
+                      value={currentSong.cifraUrl || buildBananaCifrasUrl(currentSong.artist, currentSong.title)}
+                      onChange={e => setCurrentSong({ ...currentSong, cifraUrl: e.target.value })}
+                      placeholder="https://www.bananacifras.com/cifra/..."
+                      className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-xs focus:border-red-500 focus:outline-none"
+                    />
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <div className="flex items-center gap-2">
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">BPM (Andamento):</label>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">BPM:</label>
                       <input
                         type="number"
                         value={currentSong.bpm || 70}
@@ -797,7 +694,6 @@ export default function MinisterSetlistEditor({
                       />
                     </div>
 
-                    {/* Direct Shortcuts to Banana Cifras & Cifra Club */}
                     {(currentSong.title || currentSong.cifraUrl) && (
                       <div className="flex items-center gap-1.5">
                         <a
@@ -806,7 +702,7 @@ export default function MinisterSetlistEditor({
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 hover:bg-amber-200 transition"
                         >
-                          <span>🍌 Banana Cifras</span>
+                          <span>🍌 Abrir Banana Cifras</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                         <a
@@ -815,7 +711,7 @@ export default function MinisterSetlistEditor({
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-200 transition"
                         >
-                          <span>🎸 Cifra Club</span>
+                          <span>🎸 Abrir Cifra Club</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
@@ -828,7 +724,7 @@ export default function MinisterSetlistEditor({
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Letra com Cifras (para visualização e transposição em 1 ou 2 colunas no app)
+                    Letra com Cifras (mapeada do Google Docs ou colada abaixo)
                   </label>
                   <div className="flex items-center gap-2">
                     <button
@@ -885,14 +781,25 @@ export default function MinisterSetlistEditor({
                 <Music className="w-12 h-12 text-slate-400 dark:text-slate-600 mx-auto mb-3" />
                 <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Nenhuma música adicionada ainda</h4>
                 <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Como ministro desta semana, clique no botão acima para adicionar as músicas que você vai conduzir neste domingo.
+                  Importe diretamente do arquivo Google Docs da semana ou adicione manualmente.
                 </p>
-                <button
-                  onClick={handleOpenNewSong}
-                  className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-500 transition"
-                >
-                  + Adicionar Primeira Música
-                </button>
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  {onOpenGoogleDocsModal && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenGoogleDocsModal(activeSchedule.id)}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-sky-600 text-white hover:bg-sky-500 transition"
+                    >
+                      📄 Importar do Google Docs
+                    </button>
+                  )}
+                  <button
+                    onClick={handleOpenNewSong}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-500 transition"
+                  >
+                    + Adicionar Música
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -907,7 +814,6 @@ export default function MinisterSetlistEditor({
                     >
                       {/* Left: Index, Thumbnail & Song Info */}
                       <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-                        {/* Order Index and Reorder Arrows */}
                         <div className="flex flex-col items-center justify-center shrink-0">
                           <button
                             disabled={idx === 0}
@@ -930,7 +836,6 @@ export default function MinisterSetlistEditor({
                           </button>
                         </div>
 
-                        {/* YouTube Thumbnail preview (if available) */}
                         {thumb ? (
                           <div 
                             onClick={() => onOpenYouTubePlayer(song, activeSchedule.songs)}
@@ -951,7 +856,6 @@ export default function MinisterSetlistEditor({
                           </div>
                         )}
 
-                        {/* Title, Artist, Version & Notes */}
                         <div className="min-w-0 flex-1">
                           <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-base line-clamp-1" title={song.title}>
                             {song.title}
@@ -961,13 +865,12 @@ export default function MinisterSetlistEditor({
                             {song.artist} {song.version ? `• ${song.version}` : ''}
                           </p>
 
-                          {/* Dedicated Badges Row */}
                           <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
                             <span className="font-mono font-extrabold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/60 px-2 py-0.5 rounded text-xs border border-red-300 dark:border-red-800/60">
                               Tom: {song.key}
                             </span>
                             {song.originalKey && song.originalKey !== song.key ? (
-                              <span className="text-[10px] text-red-800 dark:text-red-300 bg-red-50/70 dark:bg-red-950/40 px-1.5 py-0.5 rounded border border-red-200 dark:border-red-800 font-mono font-semibold" title={`Tom original da gravação no YouTube: ${song.originalKey}`}>
+                              <span className="text-[10px] text-red-800 dark:text-red-300 bg-red-50/70 dark:bg-red-950/40 px-1.5 py-0.5 rounded border border-red-200 dark:border-red-800 font-mono font-semibold" title={`Tom original: ${song.originalKey}`}>
                                 Original: {song.originalKey} ➔ Min: {song.key}
                               </span>
                             ) : (
@@ -992,7 +895,6 @@ export default function MinisterSetlistEditor({
 
                       {/* Right: Actions */}
                       <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                        {/* Play Reference Video */}
                         <button
                           onClick={() => onOpenYouTubePlayer(song, activeSchedule.songs)}
                           title="Assistir/Ouvir versão de referência no YouTube"
@@ -1002,7 +904,6 @@ export default function MinisterSetlistEditor({
                           <span>Vídeo</span>
                         </button>
 
-                        {/* View Chords */}
                         <button
                           onClick={() => onOpenChordViewer(song)}
                           title="Visualizar cifra com transposição"
@@ -1012,7 +913,6 @@ export default function MinisterSetlistEditor({
                           <span>Cifra</span>
                         </button>
 
-                        {/* Edit Song */}
                         <button
                           onClick={() => handleEditSong(song)}
                           title="Editar música"
@@ -1021,7 +921,6 @@ export default function MinisterSetlistEditor({
                           <Edit3 className="w-4 h-4" />
                         </button>
 
-                        {/* Delete Song */}
                         <button
                           onClick={() => handleDeleteSong(song.id)}
                           title="Excluir música"

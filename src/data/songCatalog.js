@@ -612,6 +612,226 @@ G                        Em7
 Cantarei quão grande é o meu Deus
              D                G
 E todos hão de ver quão grande é o meu Deus!`
+  },
+  {
+    id: 'cat-16',
+    title: 'Espírito Enche a Minha Vida',
+    artist: 'Quatro por Um',
+    version: 'Quatro por Um (Google Docs IBU)',
+    originalKey: 'F',
+    key: 'F',
+    bpm: 72,
+    youtubeUrl: '',
+    cifraUrl: 'https://www.bananacifras.com/cifra/q/quatro-por-um/espirito-enche-a-minha-vida',
+    notes: 'Intro Bb (8 tempos) Gm (8 tempos)',
+    chordsText: `Tom: F
+[Intro] Bb 8 tempo  Gm 8 tempo
+
+   F            Bb9                C
+Espírito, enche a minha vida
+F                 Bb                   C
+Espírito, enche a minha vida
+Dm              C                   Bb9
+Enche-me do Teu poder, pois de
+            F/A
+Ti eu quero ser
+   Gm     C                  F
+Espírito, enche o meu ser
+
+[Refrão]
+Bb9            C             Am  Dm
+As minhas mãos eu quero levantar
+Bb9      C         Dm
+E em louvor Te adorar
+Bb9      C                 Am   Dm
+Meu coração eu quero derramar
+Gm          C     F
+Diante do Teu altar`
+  },
+  {
+    id: 'cat-17',
+    title: 'Que Se Abram os Céus',
+    artist: 'Nívea Soares',
+    version: 'Nívea Soares (Google Docs IBU)',
+    originalKey: 'A',
+    key: 'A',
+    bpm: 68,
+    youtubeUrl: '',
+    cifraUrl: 'https://www.bananacifras.com/cifra/n/nivea-soares/que-se-abram-os-ceus',
+    notes: 'Inclui solo F#m A F#m E.',
+    chordsText: `Tom: A
+A
+Tu És bem-vindo aqui
+                F#m
+E em nosso coração
+ D7M        A   E/G#
+Toma a direção
+ A
+Deus fogo consumidor
+                  F#m
+Sem impedimentos vem
+        D7M      A  E/G#
+Face a face, Senhor
+
+[Pré-Refrão]
+ D    E   F#m
+Sopra em nós
+   D  E  F#m
+Espírito
+ D   E F#m    E
+Te queremos, Deus
+
+[Solo] F#m  A  F#m  E
+
+[Refrão]
+        F#m
+Que se abram os céus
+        D
+O Teu reino vem
+        F#m
+Nossa fé está
+        E
+No nosso Deus`
+  },
+  {
+    id: 'cat-18',
+    title: 'Pai Nosso',
+    artist: 'Ministério Pedras Vivas',
+    version: 'Pedras Vivas (Google Docs IBU)',
+    originalKey: 'B',
+    key: 'B',
+    bpm: 70,
+    youtubeUrl: '',
+    cifraUrl: 'https://www.bananacifras.com/cifra/p/pedras-vivas/pai-nosso',
+    notes: 'Intro: B B G#m E',
+    chordsText: `Tom: B
+[Intro] B  B  G#m  E
+
+B
+Pai nosso, nos céus
+E                    F#
+Santo é o Teu nome
+         B
+Teu reino buscamos
+        E                 F#
+Tua vontade seja feita
+
+[Refrão]
+E             B/D#  C#m    G#m
+Na terra como é nos céus
+             F#
+Deixe o céu descer
+E    B/D#        C#m    G#m
+Na terra como é nos céus
+F#               E
+Deixe o céu descer`
+  },
+  {
+    id: 'cat-19',
+    title: 'O Escudo',
+    artist: 'Lukas Agustinho / Voz da Verdade',
+    version: 'Lukas Agustinho (Google Docs IBU)',
+    originalKey: 'D',
+    key: 'D',
+    bpm: 70,
+    youtubeUrl: '',
+    cifraUrl: 'https://www.bananacifras.com/cifra/v/voz-da-verdade/o-escudo',
+    notes: 'Contém ponte/transição para Sou Um Milagre em E.',
+    chordsText: `Tom: D
+[Intro] D  Em  A  D
+
+D                                   Em
+Por toda minha vida, ó Senhor Te louvarei
+                               A             D
+Pois meu fôlego é Tua vida, e nunca me cansarei
+D                                      Em
+Posso ouvir a Sua voz, é mais doce do que o mel
+                               A          D
+Que me tira desta cova, e me leva até o céu
+
+[Refrão]
+        Bm              F#m
+Não há ferrolhos, nem portas
+        G              A      D
+Que se fechem diante da Tua voz
+        Bm            F#m
+Não há doenças, nem culpa
+     G          A        D
+Que fiquem de pé diante de nós
+      Bm            F#m
+E a tempestade se acalma
+    G        A          D
+Na voz Daquele que tudo criou
+     A/C#  Bm        F#m
+Pois Sua palavra é pura
+G                  A      D
+Escudo para os que Nele creem`
+  },
+  {
+    id: 'cat-20',
+    title: 'Em Espírito, Em Verdade (Meu Prazer)',
+    artist: 'Duda Pradino / Koinonya',
+    version: 'Versão Duda Pradino',
+    originalKey: 'G',
+    key: 'E',
+    bpm: 70,
+    youtubeUrl: '',
+    cifraUrl: 'https://www.bananacifras.com/cifra/m/ministerio-koinonya-de-louvor/meu-prazer',
+    notes: 'Começa no violão e piano suave. No refrão 2 entra a bateria cheia.',
+    chordsText: `Tom: G
+[Intro] G  Bm7  C9  D
+
+[Primeira Parte]
+G                Bm7
+ Em espírito, em verdade
+C9              Am7       D
+ Te adoramos, Te adoramos
+G                Bm7
+ Em espírito, em verdade
+C9              Am7       D
+ Te adoramos, Te adoramos
+
+[Refrão]
+Em             Bm7
+ Rei dos reis e Senhor
+C9       D        G    D/F#
+ Te entregamos nosso viver
+Em             Bm7
+ Rei dos reis e Senhor
+C9       Am7          D
+ Te entregamos nosso viver
+
+[Ponte]
+      C9          D/C
+Pra Te adorar, ó Rei dos reis
+     Bm7           Em7
+Foi que eu nasci, ó Rei Jesus
+    Am7          D
+Meu prazer é Te louvar
+    Am7     D       G
+Meu prazer é estar nos átrios do Senhor`
+  },
+  {
+    id: 'cat-21',
+    title: 'Louve',
+    artist: 'Lukas Agustinho, Samuel Messias, Eliezer',
+    version: 'Ao Vivo',
+    originalKey: 'G',
+    key: 'A',
+    bpm: 70,
+    youtubeUrl: '',
+    cifraUrl: 'https://www.bananacifras.com/cifra/l/lukas-agustinho/louve',
+    notes: 'Celebração e louvor congregacional.',
+    chordsText: `Tom: G
+[Intro] G  C9  Em7  D
+
+[Refrão]
+G
+ Louve enquanto está esperando
+C9
+ Louve, Deus está trabalhando
+Em7                     D
+ Louve, a vitória já chegou!`
   }
 ];
 
