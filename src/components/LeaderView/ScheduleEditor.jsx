@@ -7,12 +7,12 @@ import {
   Users, 
   Plus, 
   Trash2, 
-  Edit3, 
   AlertCircle, 
-  CheckCircle2,
-  Share2,
-  ChevronRight,
-  Music
+  CheckCircle2, 
+  Share2, 
+  ChevronRight, 
+  Music,
+  Mic2
 } from 'lucide-react';
 
 export default function ScheduleEditor({ 
@@ -25,11 +25,10 @@ export default function ScheduleEditor({
   onOpenWhatsApp
 }) {
   const [selectedScheduleId, setSelectedScheduleId] = useState(schedules[0]?.id || '');
-  const [isEditingRehearsal, setIsEditingRehearsal] = useState(false);
 
   const activeSchedule = schedules.find(s => s.id === selectedScheduleId) || schedules[0];
 
-  // Calculate monthly stats per member (to help leader balance schedules)
+  // Calculate monthly stats per member
   const memberCounts = {};
   schedules.forEach(sched => {
     const l = sched.lineup;
@@ -88,64 +87,100 @@ export default function ScheduleEditor({
     });
   };
 
+  const assignedCount = [
+    activeSchedule?.lineup.ministration,
+    ...(activeSchedule?.lineup.vocals || []),
+    activeSchedule?.lineup.bass,
+    activeSchedule?.lineup.drums,
+    activeSchedule?.lineup.guitar1,
+    activeSchedule?.lineup.guitar2,
+    activeSchedule?.lineup.keyboard,
+    activeSchedule?.lineup.acousticGuitar
+  ].filter(Boolean).length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       
-      {/* Top Banner with Stats & Instructions */}
-      <div className="glass-card p-5 sm:p-6 rounded-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      {/* Studio Header Card */}
+      <div className="glass-card p-4 sm:p-5 rounded-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-                Painel da Liderança
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                Edição Detalhada da Escala
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">Novembro 2026 ({schedules.length} Cultos)</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Novembro 2026 • {schedules.length} Cultos
+              </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-              Gestão da Escala de Músicos
-            </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-2xl">
-              Monte a escala de cada fim de semana, distribua os instrumentos e defina as informações de ensaio da semana.
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+              Gestão de Escalas & Ensaios
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+              Defina o ministro, distribua os instrumentos por domingo e cadastre o dia/local do ensaio.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => onOpenWhatsApp(activeSchedule)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-lg shadow-emerald-600/20"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition active:scale-[0.98] shadow-2xs"
             >
-              <Share2 className="w-4 h-4" />
-              <span>Gerar p/ WhatsApp</span>
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Escala p/ WhatsApp</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Date Tabs (Horizontal Scroll on Mobile) */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+      {/* Horizontal Sunday Selector Strip */}
+      <div 
+        role="tablist"
+        aria-label="Domingos para edição detalhada"
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5"
+      >
         {schedules.map((sched) => {
           const isSelected = sched.id === selectedScheduleId;
-          const [year, month, day] = sched.date.split('-');
+          const [, month, day] = sched.date.split('-');
+          const ministerName = sched.lineup.ministration ? `Min: ${sched.lineup.ministration}` : 'A definir';
+
           return (
             <button
               key={sched.id}
+              role="tab"
+              aria-selected={isSelected}
               onClick={() => setSelectedScheduleId(sched.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left shrink-0 transition-all duration-200 ${
+              className={`group relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all duration-150 active:scale-[0.99] ${
                 isSelected
-                  ? 'bg-sky-600 text-white border-sky-500 shadow-md shadow-sky-600/20'
-                  : 'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 border-sky-500/80 dark:border-sky-400/70 ring-1 ring-sky-500/20 dark:ring-sky-400/20 shadow-xs'
+                  : 'bg-white/70 dark:bg-slate-900/40 border-slate-200/80 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-900/80 hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
-              <div className={`p-2 rounded-lg text-center ${isSelected ? 'bg-white text-sky-700 font-extrabold shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}>
-                <span className="block text-[10px] font-bold uppercase leading-none">Dom</span>
-                <span className="block text-sm font-extrabold leading-none mt-1">{day}/{month}</span>
+              {/* Date Block */}
+              <div
+                className={`w-11 h-11 rounded-lg flex flex-col items-center justify-center shrink-0 tabular-nums border transition-colors ${
+                  isSelected
+                    ? 'bg-sky-500/10 dark:bg-sky-400/10 border-sky-500/30 dark:border-sky-400/30 text-sky-700 dark:text-sky-300'
+                    : 'bg-slate-100 dark:bg-slate-800/80 border-slate-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                <span className="text-[9px] font-bold uppercase tracking-wider opacity-75 leading-none">
+                  Dom
+                </span>
+                <span className="text-xs font-extrabold leading-none mt-1">
+                  {day}/{month}
+                </span>
               </div>
-              <div>
-                <p className={`text-xs font-bold leading-tight ${isSelected ? 'text-white' : 'text-slate-800 dark:text-slate-200'}`}>
-                  {sched.lineup.ministration ? `Min: ${sched.lineup.ministration}` : 'A definir'}
+
+              {/* Sunday Details */}
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-bold truncate ${
+                  isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-200'
+                }`}>
+                  {ministerName}
                 </p>
-                <p className={`text-[11px] mt-0.5 ${isSelected ? 'text-sky-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 tabular-nums">
                   {sched.songs?.length || 0} músicas • {sched.confirmedMembers?.length || 0} cientes
                 </p>
               </div>
@@ -156,22 +191,22 @@ export default function ScheduleEditor({
 
       {/* Active Schedule Builder */}
       {activeSchedule && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
           
           {/* Main Lineup Column (2 cols) */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-5">
             
             {/* Header of Active Sunday */}
-            <div className="glass-card p-5 rounded-2xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-4 mb-5">
+            <div className="glass-card p-4 sm:p-5 rounded-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-3.5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                    <Calendar className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center shrink-0">
+                    <Calendar className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                       Domingo, {activeSchedule.date.split('-').reverse().join('/')}
-                    </h3>
+                    </h2>
                     <input
                       type="text"
                       value={activeSchedule.title}
@@ -186,43 +221,35 @@ export default function ScheduleEditor({
                   <span className="text-xs text-slate-500 dark:text-slate-400">
                     Presenças confirmadas:
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
-                    {activeSchedule.confirmedMembers?.length || 0} de {
-                      [
-                        activeSchedule.lineup.ministration,
-                        ...(activeSchedule.lineup.vocals || []),
-                        activeSchedule.lineup.bass,
-                        activeSchedule.lineup.drums,
-                        activeSchedule.lineup.guitar1,
-                        activeSchedule.lineup.guitar2,
-                        activeSchedule.lineup.keyboard,
-                        activeSchedule.lineup.acousticGuitar
-                      ].filter(Boolean).length
-                    }
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                    <span>{activeSchedule.confirmedMembers?.length || 0} de {assignedCount}</span>
                   </span>
                 </div>
               </div>
 
               {/* Lineup Fields Grid */}
-              <div className="space-y-4">
+              <div className="space-y-3.5">
                 
                 {/* Ministração (Worship Leader) */}
-                <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="p-3 rounded-lg bg-rose-500/[0.04] dark:bg-rose-500/[0.06] border border-rose-500/20 dark:border-rose-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center font-bold text-xs">
-                      🎤
+                    <div className="w-7 h-7 rounded-md bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 font-bold text-xs">
+                      <Mic2 className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider block">
+                      <label className="text-xs font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wider block">
                         Ministração (Líder do Culto)
                       </label>
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400">Responsável por escolher o repertório e cifras</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Responsável pelo repertório, tons e cifras
+                      </span>
                     </div>
                   </div>
                   <select
                     value={activeSchedule.lineup.ministration || ''}
                     onChange={(e) => handleLineupChange('ministration', e.target.value)}
-                    className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-sm focus:border-amber-500 focus:outline-none shadow-xs"
+                    className="h-9 bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-2.5 text-xs font-semibold focus:border-rose-500 focus:outline-none cursor-pointer"
                   >
                     <option value="">Selecione o ministro...</option>
                     {members.filter(m => m.active).map(m => (
@@ -234,29 +261,26 @@ export default function ScheduleEditor({
                 </div>
 
                 {/* Vocais */}
-                <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-xs">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">🎶</span>
-                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                        Vocais
-                      </label>
-                    </div>
+                <div className="p-3.5 rounded-lg bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800/80">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Vocais
+                    </label>
                     <button
                       onClick={handleAddVocalSlot}
-                      className="flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 font-semibold transition"
+                      className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:underline font-semibold"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Adicionar Vocal</span>
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {(activeSchedule.lineup.vocals || []).map((vocalName, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
+                      <div key={idx} className="flex items-center gap-1.5">
                         <select
                           value={vocalName}
                           onChange={(e) => handleVocalChange(idx, e.target.value)}
-                          className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-xs sm:text-sm focus:border-sky-500 focus:outline-none font-medium"
+                          className="flex-1 h-8 bg-white dark:bg-slate-900 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md px-2.5 text-xs font-medium focus:border-sky-500 focus:outline-none cursor-pointer"
                         >
                           <option value="">Selecione vocal {idx + 1}...</option>
                           {members.filter(m => m.active).map(m => (
@@ -267,28 +291,28 @@ export default function ScheduleEditor({
                         </select>
                         <button
                           onClick={() => handleRemoveVocalSlot(idx)}
-                          className="p-1.5 text-slate-400 hover:text-red-500 transition"
+                          className="flex items-center justify-center w-8 h-8 text-slate-400 hover:text-rose-600 rounded-md transition"
                           title="Remover vaga de vocal"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Instrumentos - 2 Columns */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Instruments Grid (2 Columns) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   
                   {/* Violão */}
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      🎸 Violão:
+                  <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      Violão:
                     </span>
                     <select
                       value={activeSchedule.lineup.acousticGuitar || ''}
                       onChange={(e) => handleLineupChange('acousticGuitar', e.target.value)}
-                      className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:border-sky-500 focus:outline-none max-w-[170px] font-medium"
+                      className="h-8 bg-slate-50 dark:bg-slate-950 border border-slate-300/70 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-md px-2 text-xs focus:border-sky-500 focus:outline-none max-w-[160px] font-medium"
                     >
                       <option value="">Selecione...</option>
                       {members.filter(m => m.active).map(m => (
@@ -300,14 +324,14 @@ export default function ScheduleEditor({
                   </div>
 
                   {/* Teclado */}
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      🎹 Teclado:
+                  <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      Teclado:
                     </span>
                     <select
                       value={activeSchedule.lineup.keyboard || ''}
                       onChange={(e) => handleLineupChange('keyboard', e.target.value)}
-                      className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:border-sky-500 focus:outline-none max-w-[170px] font-medium"
+                      className="h-8 bg-slate-50 dark:bg-slate-950 border border-slate-300/70 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-md px-2 text-xs focus:border-sky-500 focus:outline-none max-w-[160px] font-medium"
                     >
                       <option value="">Selecione...</option>
                       {members.filter(m => m.active).map(m => (
@@ -319,14 +343,14 @@ export default function ScheduleEditor({
                   </div>
 
                   {/* Guitarra 1 */}
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      ⚡ Guitarra 1:
+                  <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      Guitarra 1:
                     </span>
                     <select
                       value={activeSchedule.lineup.guitar1 || ''}
                       onChange={(e) => handleLineupChange('guitar1', e.target.value)}
-                      className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:border-sky-500 focus:outline-none max-w-[170px] font-medium"
+                      className="h-8 bg-slate-50 dark:bg-slate-950 border border-slate-300/70 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-md px-2 text-xs focus:border-sky-500 focus:outline-none max-w-[160px] font-medium"
                     >
                       <option value="">Selecione...</option>
                       {members.filter(m => m.active).map(m => (
@@ -338,14 +362,14 @@ export default function ScheduleEditor({
                   </div>
 
                   {/* Guitarra 2 */}
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      ⚡ Guitarra 2:
+                  <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      Guitarra 2:
                     </span>
                     <select
                       value={activeSchedule.lineup.guitar2 || ''}
                       onChange={(e) => handleLineupChange('guitar2', e.target.value)}
-                      className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:border-sky-500 focus:outline-none max-w-[170px] font-medium"
+                      className="h-8 bg-slate-50 dark:bg-slate-950 border border-slate-300/70 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-md px-2 text-xs focus:border-sky-500 focus:outline-none max-w-[160px] font-medium"
                     >
                       <option value="">(Nenhum / Opcional)</option>
                       {members.filter(m => m.active).map(m => (
@@ -357,14 +381,14 @@ export default function ScheduleEditor({
                   </div>
 
                   {/* Baixo */}
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      🎸 Baixo:
+                  <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      Baixo:
                     </span>
                     <select
                       value={activeSchedule.lineup.bass || ''}
                       onChange={(e) => handleLineupChange('bass', e.target.value)}
-                      className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:border-sky-500 focus:outline-none max-w-[170px] font-medium"
+                      className="h-8 bg-slate-50 dark:bg-slate-950 border border-slate-300/70 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-md px-2 text-xs focus:border-sky-500 focus:outline-none max-w-[160px] font-medium"
                     >
                       <option value="">Selecione...</option>
                       {members.filter(m => m.active).map(m => (
@@ -376,14 +400,14 @@ export default function ScheduleEditor({
                   </div>
 
                   {/* Bateria */}
-                  <div className="p-3 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      🥁 Bateria:
+                  <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                      Bateria:
                     </span>
                     <select
                       value={activeSchedule.lineup.drums || ''}
                       onChange={(e) => handleLineupChange('drums', e.target.value)}
-                      className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1 text-xs focus:border-sky-500 focus:outline-none max-w-[170px] font-medium"
+                      className="h-8 bg-slate-50 dark:bg-slate-950 border border-slate-300/70 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-md px-2 text-xs focus:border-sky-500 focus:outline-none max-w-[160px] font-medium"
                     >
                       <option value="">Selecione...</option>
                       {members.filter(m => m.active).map(m => (
@@ -399,61 +423,59 @@ export default function ScheduleEditor({
               </div>
             </div>
 
-            {/* Ensaio da Semana Settings ("Os ensaios continuam sendo definidos durante a semana") */}
-            <div className="glass-card p-5 rounded-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                    <Clock className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                      Ensaio da Semana
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Informações para o grupo de WhatsApp e painel do músico
-                    </p>
-                  </div>
+            {/* Ensaio da Semana Settings */}
+            <div className="glass-card p-4 sm:p-5 rounded-xl space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 flex items-center justify-center shrink-0">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                    Ensaio da Semana
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Sincronizado automaticamente no painel dos músicos e na mensagem do WhatsApp
+                  </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Data do Ensaio</label>
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Data do Ensaio</label>
                   <input
                     type="date"
                     value={activeSchedule.rehearsal?.date || ''}
                     onChange={(e) => handleRehearsalChange('date', e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none font-medium"
+                    className="w-full h-9 bg-slate-50 dark:bg-slate-950 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-2.5 text-xs focus:border-sky-500 focus:outline-none font-medium"
                   />
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Horário</label>
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Horário</label>
                   <input
                     type="time"
                     value={activeSchedule.rehearsal?.time || '16:00'}
                     onChange={(e) => handleRehearsalChange('time', e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none font-medium"
+                    className="w-full h-9 bg-slate-50 dark:bg-slate-950 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-2.5 text-xs focus:border-sky-500 focus:outline-none font-medium"
                   />
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Local</label>
+                <div className="space-y-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Local</label>
                   <input
                     type="text"
                     value={activeSchedule.rehearsal?.location || 'Templo Principal'}
                     onChange={(e) => handleRehearsalChange('location', e.target.value)}
                     placeholder="Ex: Templo Principal"
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none font-medium"
+                    className="w-full h-9 bg-slate-50 dark:bg-slate-950 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 text-xs focus:border-sky-500 focus:outline-none font-medium"
                   />
                 </div>
-                <div className="sm:col-span-3">
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">Avisos ou Observações</label>
+                <div className="sm:col-span-3 space-y-1">
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400">Avisos ou Observações</label>
                   <input
                     type="text"
                     value={activeSchedule.rehearsal?.notes || ''}
                     onChange={(e) => handleRehearsalChange('notes', e.target.value)}
                     placeholder="Ex: Chegar 15 minutos antes para afinar instrumentos"
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-lg px-3 py-1.5 text-xs focus:border-indigo-400 focus:outline-none font-medium"
+                    className="w-full h-9 bg-slate-50 dark:bg-slate-950 border border-slate-300/80 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 text-xs focus:border-sky-500 focus:outline-none font-medium"
                   />
                 </div>
               </div>
@@ -462,19 +484,25 @@ export default function ScheduleEditor({
           </div>
 
           {/* Right Sidebar: Frequency Monitor & Repertoire quick check */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             
-            {/* Monthly Load / Frequency Balance Card */}
-            <div className="glass-card p-5 rounded-2xl">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center justify-between mb-3">
-                <span>Escalas no Mês</span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal">Novembro 2026</span>
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                Monitore a carga para evitar sobrecarregar integrantes.
-              </p>
+            {/* Monthly Load Monitor Card */}
+            <div className="glass-card p-4 sm:p-5 rounded-xl space-y-3">
+              <div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Frequência no Mês
+                  </h3>
+                  <span className="text-[11px] font-mono tabular-nums text-slate-400">
+                    Nov 2026
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Evite sobrecarregar integrantes com mais de 3 escalas.
+                </p>
+              </div>
 
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
                 {Object.entries(memberCounts)
                   .sort(([, a], [, b]) => b - a)
                   .map(([name, count]) => {
@@ -482,48 +510,51 @@ export default function ScheduleEditor({
                     return (
                       <div 
                         key={name}
-                        className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs shadow-xs"
+                        className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-xs shadow-2xs"
                       >
                         <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">{name}</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`px-2 py-0.5 rounded font-mono font-bold ${
-                            isHigh ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                          }`}>
-                            {count} {count === 1 ? 'escala' : 'escalas'}
-                          </span>
-                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-mono tabular-nums font-bold ${
+                          isHigh 
+                            ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30' 
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                        }`}>
+                          {count} {count === 1 ? 'escala' : 'escalas'}
+                        </span>
                       </div>
                     );
                   })}
               </div>
             </div>
 
-            {/* Repertoire Status for this Sunday */}
-            <div className="glass-card p-5 rounded-2xl">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Music className="w-4 h-4 text-sky-500" />
-                  <span>Repertório da Semana</span>
-                </h4>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-500/20">
-                  {activeSchedule.songs?.length || 0} músicas
+            {/* Repertoire Status Card */}
+            <div className="glass-card p-4 sm:p-5 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Music className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Repertório do Culto
+                  </h3>
+                </div>
+                <span className="px-1.5 py-0.2 rounded text-[11px] font-semibold tabular-nums bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  {activeSchedule.songs?.length || 0}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                O ministro(a) <strong className="text-amber-700 dark:text-amber-300">{activeSchedule.lineup.ministration || 'definido'}</strong> define as músicas e referências do YouTube.
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Ministro: <strong className="text-slate-800 dark:text-slate-200">{activeSchedule.lineup.ministration || 'A definir'}</strong>
               </p>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {(activeSchedule.songs || []).map((song, i) => (
                   <div 
                     key={song.id || i}
-                    className="p-2.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between gap-2 shadow-xs"
+                    className="p-2 rounded-lg bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 text-xs flex items-center justify-between gap-2"
                   >
                     <div className="truncate">
                       <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">{song.title}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{song.artist}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{song.artist}</p>
                     </div>
-                    <span className="font-mono font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/80 px-2 py-0.5 rounded border border-sky-200 dark:border-sky-900">
+                    <span className="font-mono font-bold text-[11px] tabular-nums text-sky-700 dark:text-sky-300 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
                       {song.key}
                     </span>
                   </div>
@@ -531,9 +562,9 @@ export default function ScheduleEditor({
 
                 <button
                   onClick={() => onSelectScheduleForDetails(activeSchedule)}
-                  className="w-full mt-3 py-2 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sky-700 dark:text-sky-300 border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center gap-1.5 transition"
+                  className="w-full mt-2 h-9 px-3 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-sky-700 dark:text-sky-300 border border-slate-200 dark:border-slate-700 transition active:scale-[0.98] flex items-center justify-center gap-1.5"
                 >
-                  <span>Gerenciar Músicas & YouTube</span>
+                  <span>Gerenciar no Painel do Ministro</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>

@@ -326,9 +326,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-150">
       
-      {/* Top Navigation */}
+      {/* Top Studio Navigation */}
       <Navbar
         currentRole={currentRole}
         setCurrentRole={setCurrentRole}
@@ -339,57 +339,72 @@ export default function App() {
         onOpenWhatsAppModal={() => handleOpenWhatsApp()}
         onExportData={exportAllData}
         onResetData={handleReset}
+        syncStatus={syncStatus}
+        onSyncNow={syncFromCloud}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      {/* Main Workspace Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 space-y-6">
         
         {/* Leader Sub-tabs (when in Leader mode) */}
         {currentRole === 'leader' && (
-          <div className="flex flex-wrap items-center justify-between border-b dark:border-slate-800 border-slate-200 pb-3 gap-2">
-            <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 pb-3.5 gap-3">
+            <div
+              role="tablist"
+              aria-label="Seções do Líder"
+              className="flex items-center gap-1 p-1 bg-slate-200/60 dark:bg-slate-900/90 rounded-lg border border-slate-200/90 dark:border-slate-800/90"
+            >
               <button
+                role="tab"
+                aria-selected={leaderTab === 'macro'}
                 onClick={() => setLeaderTab('macro')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                className={`flex items-center gap-2 h-8 px-3 rounded-md text-xs font-semibold transition-all duration-150 active:scale-[0.98] ${
                   leaderTab === 'macro'
-                    ? 'bg-sky-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-xs border border-slate-200/60 dark:border-slate-700/70'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className={`w-3.5 h-3.5 ${leaderTab === 'macro' ? 'text-sky-600 dark:text-sky-400' : 'opacity-75'}`} />
                 <span>Painel Macro do Mês</span>
               </button>
               <button
+                role="tab"
+                aria-selected={leaderTab === 'schedules'}
                 onClick={() => setLeaderTab('schedules')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                className={`flex items-center gap-2 h-8 px-3 rounded-md text-xs font-semibold transition-all duration-150 active:scale-[0.98] ${
                   leaderTab === 'schedules'
-                    ? 'bg-sky-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-xs border border-slate-200/60 dark:border-slate-700/70'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                <Calendar className="w-4 h-4" />
+                <Calendar className={`w-3.5 h-3.5 ${leaderTab === 'schedules' ? 'text-sky-600 dark:text-sky-400' : 'opacity-75'}`} />
                 <span>Escalas Detalhadas</span>
               </button>
               <button
+                role="tab"
+                aria-selected={leaderTab === 'members'}
                 onClick={() => setLeaderTab('members')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
+                className={`flex items-center gap-2 h-8 px-3 rounded-md text-xs font-semibold transition-all duration-150 active:scale-[0.98] ${
                   leaderTab === 'members'
-                    ? 'bg-sky-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-xs border border-slate-200/60 dark:border-slate-700/70'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                <Users className="w-4 h-4" />
-                <span>Integrantes ({members.length})</span>
+                <Users className={`w-3.5 h-3.5 ${leaderTab === 'members' ? 'text-sky-600 dark:text-sky-400' : 'opacity-75'}`} />
+                <span>Integrantes</span>
+                <span className="px-1.5 py-0.2 rounded text-[11px] font-medium tabular-nums bg-slate-100 dark:bg-slate-700/70 text-slate-600 dark:text-slate-300">
+                  {members.length}
+                </span>
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={syncFromCloud}
-                className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:underline transition"
+                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/70 transition active:scale-[0.98]"
                 title="Sincronizar dados com todos os aparelhos"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">
                   {syncStatus === 'syncing' ? 'Sincronizando...' : 'Sincronizado na Nuvem'}
                 </span>
@@ -397,7 +412,7 @@ export default function App() {
 
               <button
                 onClick={handleReset}
-                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 transition"
+                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition active:scale-[0.98]"
                 title="Restaurar dados iniciais"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -465,20 +480,20 @@ export default function App() {
 
       </main>
 
-      {/* Footer */}
-      <footer className="border-t dark:border-slate-900 border-slate-200 bg-white/70 dark:bg-slate-950/80 py-6 text-xs text-slate-500 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+      {/* Minimal Studio Footer */}
+      <footer className="border-t border-slate-200/80 dark:border-slate-800/70 bg-white/60 dark:bg-slate-950/60 py-4 text-xs text-slate-500 dark:text-slate-400 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-center sm:text-left">
           <div className="flex items-center gap-2 flex-wrap justify-center">
-            <span className="font-semibold text-slate-700 dark:text-slate-400">LouvorSync</span>
-            <span>•</span>
-            <span>Automação da Escala & Central de Repertório da Igreja</span>
-            <span>•</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">LouvorSync</span>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span>Gestão de Escalas & Repertório</span>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
             <button
               onClick={syncFromCloud}
-              className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium hover:underline"
+              className="inline-flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-medium transition"
               title="Clique para atualizar os dados da nuvem agora"
             >
-              <Cloud className="w-3.5 h-3.5" />
+              <Cloud className="w-3.5 h-3.5 text-emerald-500" />
               <span>{syncStatus === 'syncing' ? 'Sincronizando...' : 'Nuvem Ativa'}</span>
             </button>
           </div>
@@ -488,21 +503,22 @@ export default function App() {
               href={googleDocsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 transition"
+              className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition"
             >
-              <span>Abrir Google Docs</span>
-              <ExternalLink className="w-3 h-3" />
+              <span>Google Docs</span>
+              <ExternalLink className="w-3 h-3 opacity-75" />
             </a>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
             <button
               onClick={() => handleOpenGoogleDocsModal('')}
-              className="flex items-center gap-1 text-sky-600 dark:text-sky-400 hover:underline font-semibold"
+              className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400 hover:underline font-medium"
               title="Importar músicas do Google Docs ou atualizar link"
             >
               <FileEdit className="w-3 h-3" />
-              <span>Importar / Editar Docs</span>
+              <span>Importar Repertório</span>
             </button>
-            <span>•</span>
-            <span className="text-slate-400 dark:text-slate-600">Novembro 2026</span>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span className="tabular-nums text-slate-400 dark:text-slate-500">Nov 2026</span>
           </div>
         </div>
       </footer>
